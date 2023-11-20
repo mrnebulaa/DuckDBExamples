@@ -1,5 +1,6 @@
 import duckdb
 import pandas as pd
+import os
 
 def load_data(file_path, table_name, database_path):
     """
@@ -8,11 +9,26 @@ def load_data(file_path, table_name, database_path):
     Parameters:
     - file_path: The path to the CSV file.
     - table_name: The name of the DuckDB table to create.
+    - database_path: The path to results
     
     Returns:
     - A DuckDB connection object.
     """
-    con = duckdb.connect(database=f'{database_path}', read_only=False)
+    database_file_path = f'{database_path}/{table_name}.db'
+
+    if os.path.exists(database_file_path):
+        con = duckdb.connect(database=database_file_path, read_only=False)
+        
+        # Check if the table already exists in the database
+        existing_tables = con.execute('SHOW TABLES').fetchdf()['name'].tolist()
+        if table_name in existing_tables:
+            print(f"Table '{table_name}' already exists in the database.")
+            return con
+    else:
+        # Create a new database if it doesn't exist
+        os.makedirs(database_path, exist_ok=True)
+        con = duckdb.connect(database=database_file_path, read_only=False)
+    
     con.execute(f'CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto(\'{file_path}\')')
     return con
 
@@ -44,17 +60,11 @@ def top_cuisines_by_borough(con):
         # Display the top 10 cuisines
         print(result)
 
-        unique_boroughs = con.execute('SELECT DISTINCT "BORO" FROM restaurant_data').fetchdf()
-        print(unique_boroughs)
-
 
 if __name__ == "__main__":
-    # Replace 'your_data.csv' with the actual path to your CSV file
     data_path = 'RestaurantsNYC\data\DOHMH_New_York_City_Restaurant_Inspection_Results.csv'
-    
-    # Replace 'restaurant_data' with the desired table name
     table_name = 'restaurant_data'
-    database_path = 'restaurant.db'
+    database_path = 'results'
     
     # Load data into DuckDB
     duckdb_connection = load_data(data_path, table_name, database_path)
